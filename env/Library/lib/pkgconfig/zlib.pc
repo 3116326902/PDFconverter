@@ -1,0 +1,13 @@
+prefix=E:/Graduationproject/pdf转换器/env/Library
+exec_prefix=E:/Graduationproject/pdf转换器/env/Library
+libdir=E:/Graduationproject/pdf转换器/env/Library/lib
+sharedlibdir=E:/Graduationproject/pdf转换器/env/Library/lib
+includedir=E:/Graduationproject/pdf转换器/env/Library/include
+
+Name: zlib
+Description: zlib compression library
+Version: 1.3.1
+
+Requires:
+Libs: -L${libdir} -L${sharedlibdir} -lz
+Cflags: -I${includedir}
