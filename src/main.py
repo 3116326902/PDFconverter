@@ -1,83 +1,53 @@
 import tkinter as tk
+from tkinter import ttk #tkinter 美化组件
 from tkinter import messagebox  # 弹窗组件
 
-# 定义主窗口类（面向对象写法，更易扩展）
-class SimpleGUI:
+# 定义主窗口类
+class GUI:
     def __init__(self, root):
         # 初始化主窗口
         self.root = root
-        self.root.title("简易信息查询工具")  # 窗口标题
-        self.root.geometry("400x250")  # 窗口大小（宽x高）
-        self.root.resizable(False, False)  # 禁止调整窗口大小
+        self.root.title("PDF转换器")  # 窗口标题
+        self.root.geometry("1080x720")  # 窗口大小
+        self.root.minsize(720, 480) #规定最小窗口大小
+        self.root.resizable(True, True) #允许窗口调整大小
 
-        # 1. 创建标签（提示文字）
-        self.label = tk.Label(
-            root, 
-            text="请输入查询内容：", 
-            font=("微软雅黑", 12)  # 字体和大小
-        )
-        self.label.pack(pady=10)  # 布局（垂直间距10像素）
+        #配置内部元素比例
+        self.root.grid_columnconfigure(0,weight=1)
+        self.root.grid_columnconfigure(1,weight=14) #列比例
 
-        # 2. 创建输入框
-        self.input_entry = tk.Entry(
-            root, 
-            font=("微软雅黑", 12), 
-            width=30  # 输入框宽度
-        )
-        self.input_entry.pack(pady=5)
+        self.root.grid_rowconfigure(0,weight=1)
+        self.root.grid_rowconfigure(1,weight=9) #行比例
 
-        # 3. 创建按钮框架（放两个按钮，横向排列）
-        self.btn_frame = tk.Frame(root)
-        self.btn_frame.pack(pady=10)
+        #左侧边栏
+        left_frame = ttk.Frame(root, style="Left.TFrame") #创建左侧边栏
+        left_frame.grid(row=1, column=0, sticky="nsew")  #界面填充剩余空间
 
-        # 查询按钮
-        self.query_btn = tk.Button(
-            self.btn_frame, 
-            text="查询", 
-            font=("微软雅黑", 10), 
-            width=10,
-            command=self.query_info  # 点击触发的函数
-        )
-        self.query_btn.grid(row=0, column=0, padx=5)  # 网格布局
+        #中间界面
+        middle_frame = ttk.Frame(root, relief="raised", style="Middle.TFrame") #创建中间界面
+        middle_frame.grid(row=1, column=1, sticky="nsew")  #界面填充剩余空间
+        #中间边框圆角
 
-        # 清空按钮
-        self.clear_btn = tk.Button(
-            self.btn_frame, 
-            text="清空", 
-            font=("微软雅黑", 10), 
-            width=10,
-            command=self.clear_input  # 点击触发的函数
-        )
-        self.clear_btn.grid(row=0, column=1, padx=5)
+        #顶部界面
+        top_frame = ttk.Frame(root, style="Top.TFrame") #创建顶部界面
+        top_frame.grid(row=0, column=0,columnspan=2, sticky="nsew")  #界面填充剩余空间
 
-        # 4. 创建结果显示标签
-        self.result_label = tk.Label(
-            root, 
-            text="查询结果：", 
-            font=("微软雅黑", 12), 
-            fg="blue"  # 文字颜色
-        )
-        self.result_label.pack(pady=10)
+        #设置frame样式
+        style = ttk.Style()
+        style.configure("Left.TFrame", background="#D3D3D3")
+        style.configure("Top.TFrame", background="#D3D3D3")
+        style.configure("Middle.TFrame", background="#FFFFFF")
 
-    # 定义查询功能
-    def query_info(self):
-        input_text = self.input_entry.get().strip()  # 获取输入框内容并去空格
-        if not input_text:
-            # 弹窗提示（警告）
-            messagebox.showwarning("警告", "请输入查询内容！")
-            return
-        # 模拟查询逻辑（实际可替换为数据库/API查询）
-        result = f"你查询的内容是：{input_text}\n查询时间：2025-12-07"
-        self.result_label.config(text=f"查询结果：{result}")  # 更新标签内容
+        #添加标签
+        #左侧
+        left_label = ttk.Label(left_frame, text="功能选择", font=("微软雅黑", 14))
 
-    # 定义清空功能
-    def clear_input(self):
-        self.input_entry.delete(0, tk.END)  # 清空输入框（从0到末尾）
-        self.result_label.config(text="查询结果：")  # 重置结果标签
-        messagebox.showinfo("提示", "已清空输入！")  # 弹窗提示（信息）
+        #中间
+        middle_label = ttk.Label(middle_frame, text="最近文档", font=("微软雅黑", 14))
+
 
 # 程序入口
 if __name__ == "__main__":
     root = tk.Tk()  # 创建主窗口对象
-    app = SimpleGUI(root)  # 实例化GUI类
-    root.mainloop()  # 启动主循环（保持窗口显示）
+    app = GUI(root)  # 创建GUI
+    root.mainloop()  # 启动主循环
