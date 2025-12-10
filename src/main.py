@@ -1,17 +1,13 @@
 import sys
 import os
-import json
-import tempfile
-from datetime import datetime
 from pathlib import Path
 
 from PyQt6.QtWidgets import (
-    QApplication, QMainWindow, QWidget, QFrame, QLabel, QPushButton,
-    QListWidget, QProgressBar, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QFileDialog, QMessageBox
+    QApplication, QMainWindow, QWidget, QFrame, QLabel, QPushButton, QProgressBar, QVBoxLayout,
+    QHBoxLayout, QGridLayout,QFileDialog, QMessageBox
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QPixmap
 
 # 尝试导入转换库，缺失时提供友好提示
 try:
@@ -164,22 +160,41 @@ class PDFConverterGUI(QMainWindow):
     def create_top_frame(self, parent_layout):
         """顶部标题栏"""
         top_frame = QFrame()
-        top_frame.setStyleSheet("background-color: #D3D3D3;")
+        top_frame.setStyleSheet("background-color: #3c3f41")
         parent_layout.addWidget(top_frame, 0, 0, 1, 2)
-
         top_layout = QVBoxLayout(top_frame)
-        top_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        img_text_layout = QHBoxLayout()
 
-        title_label = QLabel("PDF转换器 - 多功能格式转换工具")
+        #加载图片
+        img_label = QLabel(top_frame) #指定父控件
+        img_label.setFixedSize(50, 50) #加载图片大小
+        img = QPixmap("PDFconverter.ico")
+        img = img.scaled(50, 50, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation) #设置图片大小,解除比例锁定
+        img_label.setPixmap(img)
+        img_label.setStyleSheet("border:0.5px solid #ffffff")
+
+        #顶部文字
+        title_label = QLabel("PDF转换器")
         title_font = QFont("微软雅黑", 14, QFont.Weight.Bold)
         title_label.setFont(title_font)
-        title_label.setStyleSheet("background-color: #D3D3D3;")
-        top_layout.addWidget(title_label)
+
+        img_text_layout.addWidget(img_label)
+        img_text_layout.addWidget(title_label)
+
+        v_layout = QVBoxLayout() #控制上下距离
+        v_layout.addSpacing(5)
+        h_layout = QHBoxLayout()
+        h_layout.addLayout(img_text_layout) #控制左右距离
+        v_layout.addLayout(h_layout)
+        v_layout.addStretch(1) #底部拉伸
+
+        top_layout.addLayout(v_layout)
+
 
     def create_left_frame(self, parent_layout):
         """左侧功能栏"""
         left_frame = QFrame()
-        left_frame.setStyleSheet("background-color: #D3D3D3;")
+        left_frame.setStyleSheet("background-color: #3c3f41")
         parent_layout.addWidget(left_frame, 1, 0)
 
         left_layout = QVBoxLayout(left_frame)
@@ -191,7 +206,6 @@ class PDFConverterGUI(QMainWindow):
         func_label = QLabel("功能选择")
         func_font = QFont("微软雅黑", 14, QFont.Weight.Bold)
         func_label.setFont(func_font)
-        func_label.setStyleSheet("background-color: #D3D3D3;")
         func_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         left_layout.addWidget(func_label)
         left_layout.addSpacing(10)
@@ -203,7 +217,6 @@ class PDFConverterGUI(QMainWindow):
                 font-size: 12px;
                 padding: 8px;
                 border-radius: 4px;
-                background-color: #f0f0f0;
             }
             QPushButton:hover {
                 background-color: #e0e0e0;
@@ -218,30 +231,55 @@ class PDFConverterGUI(QMainWindow):
         """
 
         # 功能按钮（依赖缺失时禁用）
+        # PDF转Word
         self.pdf2word_btn = QPushButton("PDF转Word")
         self.pdf2word_btn.setStyleSheet(btn_style)
         self.pdf2word_btn.clicked.connect(lambda: self.select_file("pdf2word"))
         self.pdf2word_btn.setEnabled(CONVERSION_ENABLED)
         left_layout.addWidget(self.pdf2word_btn)
 
+        # PDF转Excel
         self.pdf2excel_btn = QPushButton("PDF转Excel")
         self.pdf2excel_btn.setStyleSheet(btn_style)
         self.pdf2excel_btn.clicked.connect(lambda: self.select_file("pdf2excel"))
         self.pdf2excel_btn.setEnabled(CONVERSION_ENABLED)
         left_layout.addWidget(self.pdf2excel_btn)
 
+        # PDF转图片
         self.pdf2img_btn = QPushButton("PDF转图片")
         self.pdf2img_btn.setStyleSheet(btn_style)
         self.pdf2img_btn.clicked.connect(lambda: self.select_file("pdf2img"))
         self.pdf2img_btn.setEnabled(CONVERSION_ENABLED)
         left_layout.addWidget(self.pdf2img_btn)
 
+        # Word转PDF（修复：之前错误复用了pdf2word_btn的赋值）
+        self.word2pdf_btn = QPushButton("Word转PDF")
+        self.word2pdf_btn.setStyleSheet(btn_style)
+        self.word2pdf_btn.clicked.connect(lambda: self.select_file("word2pdf"))
+        self.word2pdf_btn.setEnabled(CONVERSION_ENABLED)
+        left_layout.addWidget(self.word2pdf_btn)
+
+        # Excel转PDF（修复：之前错误复用了pdf2excel_btn的赋值）
+        self.excel2pdf_btn = QPushButton("Excel转PDF")
+        self.excel2pdf_btn.setStyleSheet(btn_style)
+        self.excel2pdf_btn.clicked.connect(lambda: self.select_file("excel2pdf"))
+        self.excel2pdf_btn.setEnabled(CONVERSION_ENABLED)
+        left_layout.addWidget(self.excel2pdf_btn)
+
+        # 图片文字提取（修复：之前错误复用了pdf2img_btn的赋值）
+        self.img2pdf_btn = QPushButton("图片文字提取")
+        self.img2pdf_btn.setStyleSheet(btn_style)
+        self.img2pdf_btn.clicked.connect(lambda: self.select_file("img_ocr"))
+        self.img2pdf_btn.setEnabled(CONVERSION_ENABLED)
+        left_layout.addWidget(self.img2pdf_btn)
+
+        #底部拉伸，按钮置顶
         left_layout.addStretch()
 
     def create_middle_frame(self, parent_layout):
         """中间主界面"""
         middle_frame = QFrame()
-        middle_frame.setStyleSheet("background-color: #FFFFFF;")
+        middle_frame.setStyleSheet("background-color: #2b2d30")
         parent_layout.addWidget(middle_frame, 1, 1)
 
         middle_layout = QVBoxLayout(middle_frame)
@@ -252,7 +290,7 @@ class PDFConverterGUI(QMainWindow):
         recent_label = QLabel("最近文档")
         recent_font = QFont("微软雅黑", 14, QFont.Weight.Bold)
         recent_label.setFont(recent_font)
-        recent_label.setStyleSheet("background-color: #FFFFFF;")
+        recent_label.setStyleSheet("background-color: #2b2d30")
         middle_layout.addWidget(recent_label)
 
         # 选择文件按钮
