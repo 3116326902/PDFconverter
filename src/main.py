@@ -31,7 +31,10 @@ class ConversionThread(QThread):
     finished_signal = pyqtSignal(bool, str)
     conversion_type = ""
     input_file = ""
-    output_file = ""
+    PDF_output_file = ""
+    Word_output_file = ""
+    Excel_output_file = ""
+
 
     def run(self):
         try:
@@ -44,7 +47,7 @@ class ConversionThread(QThread):
                 self.pdf_to_excel()
             elif self.conversion_type == "pdf2img":
                 self.pdf_to_image()
-            self.finished_signal.emit(True, f"转换完成：\n{self.output_file}")
+            self.finished_signal.emit(True, f"转换完成：\n")
         except Exception as e:
             self.finished_signal.emit(False, f"转换失败：\n{str(e)}")
 
@@ -55,7 +58,7 @@ class ConversionThread(QThread):
         total_pages = len(pdf_doc)
 
         # 分步转换（显示进度）
-        cv.convert(self.output_file, start=0, end=None)
+        cv.convert(self.Word_output_file, start=0, end=None)
         self.progress_update.emit(100)
         cv.close()
         pdf_doc.close()
@@ -83,7 +86,7 @@ class ConversionThread(QThread):
                     self.progress_update.emit(int((i + 1) / total_pages * 100))
                     continue
 
-        workbook.save(self.output_file)
+        workbook.save(self.PDF_output_file)
         self.progress_update.emit(100)
 
     def pdf_to_image(self):
@@ -93,7 +96,7 @@ class ConversionThread(QThread):
 
         # 创建输出目录（多页PDF）
         if total_pages > 1:
-            img_dir = Path(self.output_file).parent / Path(self.output_file).stem
+            img_dir = Path(self.PDF_output_file).parent / Path(self.PDF_output_file).stem
             img_dir.mkdir(exist_ok=True)
 
         for i, page in enumerate(pdf_document):
@@ -102,7 +105,7 @@ class ConversionThread(QThread):
             if total_pages > 1:
                 img_path = str(img_dir / f"第{i+1}页.png")
             else:
-                img_path = self.output_file
+                img_path = self.PDF_output_file
 
             pix.save(img_path)
             progress = int((i + 1) / total_pages * 100)
@@ -157,10 +160,6 @@ class PDFConverterGUI(QMainWindow):
         self.create_left_frame(main_layout)
         self.create_middle_frame(main_layout)
 
-        # 加载最近文件
-        self.recent_files_path = os.path.join(tempfile.gettempdir(), "pdf_converter_recent.json")
-        self.recent_files = self.load_recent_files()
-        self.update_recent_list()
 
     def create_top_frame(self, parent_layout):
         """顶部标题栏"""
@@ -279,12 +278,6 @@ class PDFConverterGUI(QMainWindow):
         select_btn.setEnabled(CONVERSION_ENABLED)
         middle_layout.addWidget(select_btn)
 
-        # 最近文件列表
-        self.recent_list = QListWidget()
-        self.recent_list.setFont(QFont("微软雅黑", 12))
-        self.recent_list.setMinimumHeight(300)
-        self.recent_list.itemDoubleClicked.connect(self.open_recent_file)
-        middle_layout.addWidget(self.recent_list)
 
         # 进度条
         self.progress_bar = QProgressBar()
@@ -310,8 +303,6 @@ class PDFConverterGUI(QMainWindow):
         if not file_path:
             return
 
-        # 记录最近文件
-        self.add_recent_file(file_path)
 
         # 设置默认输出文件名
         base_name = os.path.splitext(file_path)[0]
@@ -374,76 +365,11 @@ class PDFConverterGUI(QMainWindow):
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(False)
 
-    def load_recent_files(self):
-        """加载最近文件列表"""
-        try:
-            if os.path.exists(self.recent_files_path):
-                with open(self.recent_files_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-        except Exception as e:
-            print(f"加载最近文件失败：{e}")
-        return []
-
-    def add_recent_file(self, file_path):
-        """添加到最近文件"""
-        # 去重
-        self.recent_files = [f for f in self.recent_files if f['path'] != file_path]
-
-        # 添加新记录
-        self.recent_files.insert(0, {
-            'path': file_path,
-            'name': os.path.basename(file_path),
-            'time': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        })
-
         # 限制最多10条
-        self.recent_files = self.recent_files[:10]
 
-        # 保存到文件
-        try:
-            with open(self.recent_files_path, 'w', encoding='utf-8') as f:
-                json.dump(self.recent_files, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            print(f"保存最近文件失败：{e}")
 
-        # 更新列表显示
-        self.update_recent_list()
 
-    def update_recent_list(self):
-        """更新最近文件列表"""
-        self.recent_list.clear()
-        for item in self.recent_files:
-            display_text = f"{item['name']} | {item['time']}"
-            list_item = self.recent_list.addItem(display_text)
-            list_item.setData(Qt.ItemDataRole.UserRole, item['path'])
 
-    def open_recent_file(self, item):
-        """双击最近文件"""
-        file_path = item.data(Qt.ItemDataRole.UserRole)
-        if not os.path.exists(file_path):
-            QMessageBox.warning(self, "提示", "文件已被移动或删除")
-            self.recent_files = [f for f in self.recent_files if f['path'] != file_path]
-            self.update_recent_list()
-            return
-
-        # 选择转换类型
-        msg_box = QMessageBox()
-        msg_box.setWindowTitle("选择转换类型")
-        msg_box.setText(f"请选择对【{os.path.basename(file_path)}】的转换类型：")
-        btn_word = msg_box.addButton("PDF转Word", QMessageBox.ButtonRole.AcceptRole)
-        btn_excel = msg_box.addButton("PDF转Excel", QMessageBox.ButtonRole.AcceptRole)
-        btn_img = msg_box.addButton("PDF转图片", QMessageBox.ButtonRole.AcceptRole)
-        msg_box.addButton("取消", QMessageBox.ButtonRole.RejectRole)
-
-        msg_box.exec()
-        clicked_btn = msg_box.clickedButton()
-
-        if clicked_btn == btn_word:
-            self.select_file_with_path("pdf2word", file_path)
-        elif clicked_btn == btn_excel:
-            self.select_file_with_path("pdf2excel", file_path)
-        elif clicked_btn == btn_img:
-            self.select_file_with_path("pdf2img", file_path)
 
     def select_file_with_path(self, conversion_type, file_path):
         """使用已有路径转换"""
