@@ -234,44 +234,30 @@ class PDFConverterGUI(QMainWindow):
         # PDF转Word
         self.pdf2word_btn = QPushButton("PDF转Word")
         self.pdf2word_btn.setStyleSheet(btn_style)
-        self.pdf2word_btn.clicked.connect(lambda: self.select_file("pdf2word"))
+        self.pdf2word_btn.clicked.connect(lambda: self.switch_to_select_func("pdf2word"))
         self.pdf2word_btn.setEnabled(CONVERSION_ENABLED)
         left_layout.addWidget(self.pdf2word_btn)
 
         # PDF转Excel
         self.pdf2excel_btn = QPushButton("PDF转Excel")
         self.pdf2excel_btn.setStyleSheet(btn_style)
-        self.pdf2excel_btn.clicked.connect(lambda: self.select_file("pdf2excel"))
+        self.pdf2excel_btn.clicked.connect(lambda: self.switch_to_select_func("pdf2excel"))
         self.pdf2excel_btn.setEnabled(CONVERSION_ENABLED)
         left_layout.addWidget(self.pdf2excel_btn)
 
-        # PDF转图片
-        self.pdf2img_btn = QPushButton("PDF转图片")
-        self.pdf2img_btn.setStyleSheet(btn_style)
-        self.pdf2img_btn.clicked.connect(lambda: self.select_file("pdf2img"))
-        self.pdf2img_btn.setEnabled(CONVERSION_ENABLED)
-        left_layout.addWidget(self.pdf2img_btn)
-
-        # Word转PDF（修复：之前错误复用了pdf2word_btn的赋值）
+        # Word转PDF
         self.word2pdf_btn = QPushButton("Word转PDF")
         self.word2pdf_btn.setStyleSheet(btn_style)
-        self.word2pdf_btn.clicked.connect(lambda: self.select_file("word2pdf"))
+        self.word2pdf_btn.clicked.connect(lambda: self.switch_to_select_func("word2pdf"))
         self.word2pdf_btn.setEnabled(CONVERSION_ENABLED)
         left_layout.addWidget(self.word2pdf_btn)
 
-        # Excel转PDF（修复：之前错误复用了pdf2excel_btn的赋值）
+        # Excel转PDF
         self.excel2pdf_btn = QPushButton("Excel转PDF")
         self.excel2pdf_btn.setStyleSheet(btn_style)
-        self.excel2pdf_btn.clicked.connect(lambda: self.select_file("excel2pdf"))
+        self.excel2pdf_btn.clicked.connect(lambda: self.switch_to_select_func("excel2pdf"))
         self.excel2pdf_btn.setEnabled(CONVERSION_ENABLED)
         left_layout.addWidget(self.excel2pdf_btn)
-
-        # 图片文字提取（修复：之前错误复用了pdf2img_btn的赋值）
-        self.img2pdf_btn = QPushButton("图片文字提取")
-        self.img2pdf_btn.setStyleSheet(btn_style)
-        self.img2pdf_btn.clicked.connect(lambda: self.select_file("img_ocr"))
-        self.img2pdf_btn.setEnabled(CONVERSION_ENABLED)
-        left_layout.addWidget(self.img2pdf_btn)
 
         #底部拉伸，按钮置顶
         left_layout.addStretch()
@@ -293,29 +279,6 @@ class PDFConverterGUI(QMainWindow):
         recent_label.setStyleSheet("background-color: #2b2d30")
         middle_layout.addWidget(recent_label)
 
-        # 选择文件按钮
-        select_btn = QPushButton("选择文件")
-        select_btn.setStyleSheet("""
-            QPushButton {
-                font-family: 微软雅黑;
-                font-size: 12px;
-                padding: 10px;
-                border-radius: 4px;
-                background-color: #4a86e8;
-                color: white;
-            }
-            QPushButton:hover {
-                background-color: #3d72d6;
-            }
-            QPushButton:disabled {
-                background-color: #88a4d8;
-                color: #dddddd;
-            }
-        """)
-        select_btn.clicked.connect(lambda: self.select_file(""))
-        select_btn.setEnabled(CONVERSION_ENABLED)
-        middle_layout.addWidget(select_btn)
-
 
         # 进度条
         self.progress_bar = QProgressBar()
@@ -323,6 +286,7 @@ class PDFConverterGUI(QMainWindow):
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(False)
         middle_layout.addWidget(self.progress_bar)
+
 
     def select_file(self, conversion_type):
         """选择PDF文件"""
@@ -350,9 +314,6 @@ class PDFConverterGUI(QMainWindow):
         elif conversion_type == "pdf2excel":
             output_file = f"{base_name}.xlsx"
             file_filter = "Excel文件 (*.xlsx)"
-        elif conversion_type == "pdf2img":
-            output_file = f"{base_name}.png"
-            file_filter = "图片文件 (*.png)"
         else:
             return
 
@@ -405,10 +366,6 @@ class PDFConverterGUI(QMainWindow):
 
         # 限制最多10条
 
-
-
-
-
     def select_file_with_path(self, conversion_type, file_path):
         """使用已有路径转换"""
         base_name = os.path.splitext(file_path)[0]
@@ -433,6 +390,167 @@ class PDFConverterGUI(QMainWindow):
 
         if save_path:
             self.start_conversion(conversion_type, file_path, save_path)
+
+    #跳转新窗口
+    def switch_to_select_func(self, conversion_type):
+        # 先检查新窗口是否已创建
+        if hasattr(self, 'selectfunc') and self.selectfunc.isVisible():
+            # 若已创建，直接激活并置顶
+            self.selectfunc.activateWindow()
+            self.selectfunc.raise_()
+        else:
+            # 若未创建，先打开新窗口
+            self.selectfunc= SelectFunc(conversion_type, self)
+            self.selectfunc.setParent(self)
+            self.selectfunc.show()
+
+class SelectFunc(QMainWindow):
+    def __init__(self, conversion_type, main_windows):
+        super().__init__()
+        self.conversion_type = conversion_type
+        self.main_window = main_windows
+        self.setStyleSheet("""
+        QMainWindow {
+            background-color: #ffffff
+        }
+        QWidget {
+            color: #F8FAFC;
+        }
+    """)
+        self.move_to_main_window_center()
+        self.init_ui()
+
+    def move_to_main_window_center(self):
+        """将新窗口移动到主窗口正中间"""
+        # 获取主窗口的几何信息（位置+大小）
+        main_geo = self.main_window.geometry()
+        # 获取新窗口的大小
+        self_geo = self.geometry()
+
+        # 计算新窗口居中位置：主窗口中心 - 新窗口半宽/半高
+        center_x = main_geo.x() + (main_geo.width() - self_geo.width()) // 2
+        center_y = main_geo.y() + (main_geo.height() - self_geo.height()) // 2
+
+        # 应用位置（仅改位置，不改大小）
+        self.move(center_x, center_y)
+
+    # 仅修改你提供的代码片段，修复问题并补全必要部分
+    def init_ui(self):
+        # 中心部件
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        # 修复：移除重复的central_widget父容器，使用独立的主布局
+        layout = QVBoxLayout(central_widget)
+
+        # 修复：second_layout不再绑定central_widget，作为子布局添加到主layout
+        second_layout = QGridLayout()
+        second_layout.setSpacing(10)
+        second_layout.setContentsMargins(10, 10, 10, 10)
+
+        second_layout.setRowStretch(0, 1)
+        second_layout.setRowStretch(1, 9)
+        second_layout.setRowStretch(2, 2)
+
+        # 修复：将grid布局添加到主垂直布局
+        layout.addLayout(second_layout)
+
+        self.create_top_frame(second_layout)
+        self.create_middle_frame(second_layout)
+        self.create_bottom_frame(second_layout)
+
+
+    def create_top_frame(self, parent_layout):
+        top_frame = QFrame()
+        top_frame.setStyleSheet("background-color: #3c3f41")
+        parent_layout.addWidget(top_frame, 0, 0, 1, 2)
+        top_layout = QVBoxLayout(top_frame)
+        # 页面内容
+        title = QLabel("✨ PDF转Word 转换界面")
+        title.setStyleSheet("font-size: 20px; color: #2E86AB;")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # 修复：添加标题到布局（原代码遗漏）
+        top_layout.addWidget(title)
+
+
+    def create_middle_frame(self, parent_layout):
+        middle_frame = QFrame()
+        middle_frame.setStyleSheet("background-color: #3c3f41")
+        # 修复：设置中间区域跨列显示，避免布局错乱
+        parent_layout.addWidget(middle_frame, 1, 0, 1, 2)
+
+        left_layout = QVBoxLayout(middle_frame)
+        left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        left_layout.setContentsMargins(10, 20, 10, 10)
+        left_layout.setSpacing(10)
+
+
+    def create_bottom_frame(self, parent_layout):
+        # 修复：创建底部容器框架，避免按钮直接添加到grid布局导致位置错乱
+        bottom_frame = QFrame()
+        bottom_frame.setStyleSheet("background-color: #3c3f41")
+        parent_layout.addWidget(bottom_frame, 2, 0, 1, 2)
+        bottom_layout = QVBoxLayout(bottom_frame)
+        bottom_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        bottom_layout.setSpacing(20)
+        bottom_layout.setContentsMargins(20, 20, 20, 20)
+
+        # 选择文件按钮（复用原有选择文件逻辑）
+        select_btn = QPushButton("选择PDF文件开始转换")
+        select_btn.setStyleSheet("""
+            QPushButton {
+                padding: 10px 20px;
+                font-size: 16px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        # 绑定点击事件，触发主窗口的选择文件逻辑
+        select_btn.clicked.connect(lambda: self.parent().select_file(self.conversion_data))
+
+        # 新增：返回主窗口按钮
+        back_btn = QPushButton("返回主窗口")
+        back_btn.setStyleSheet("""
+            QPushButton {
+                padding: 10px 20px;
+                font-size: 16px;
+                background-color: #2196F3;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                margin-top: 20px;
+            }
+            QPushButton:hover {
+                background-color: #0b7dda;
+            }
+        """)
+        # 绑定返回主窗口的逻辑
+        back_btn.clicked.connect(self.back_to_main)
+
+        # 修复：将按钮添加到底部布局中（原代码直接添加到grid布局导致位置错误）
+        bottom_layout.addWidget(select_btn)
+        bottom_layout.addWidget(back_btn)  # 加入返回按钮
+
+
+    # 实现窗口拖动（自定义标题栏必备）
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.MouseButton.LeftButton:
+            self.move(event.globalPosition().toPoint() - self.drag_pos)
+            event.accept()
+
+
+    # 新增：返回主窗口的方法
+    def back_to_main(self):
+        self.close()
 
 
 if __name__ == "__main__":
