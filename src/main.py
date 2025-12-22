@@ -4,7 +4,7 @@ from pathlib import Path
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QLabel, QPushButton, QProgressBar, QVBoxLayout,
-    QHBoxLayout, QGridLayout,QFileDialog, QMessageBox
+    QHBoxLayout, QGridLayout, QFileDialog, QMessageBox, QListWidget, QListWidgetItem
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont, QPixmap
@@ -48,7 +48,6 @@ class ConversionThread(QThread):
             self.finished_signal.emit(False, f"转换失败：\n{str(e)}")
 
     def pdf_to_word(self):
-        """PDF转Word"""
         cv = Converter(self.input_file)
         pdf_doc = fitz.open(self.input_file)
         total_pages = len(pdf_doc)
@@ -60,7 +59,6 @@ class ConversionThread(QThread):
         pdf_doc.close()
 
     def pdf_to_excel(self):
-        """PDF转Excel"""
         workbook = openpyxl.Workbook()
         worksheet = workbook.active
         worksheet.title = "PDF内容"
@@ -116,20 +114,6 @@ class PDFConverterGUI(QMainWindow):
         super().__init__()
         self.init_ui()
 
-        # 初始化转换线程
-        if CONVERSION_ENABLED:
-            self.conversion_thread = ConversionThread()
-            self.conversion_thread.progress_update.connect(self.update_progress)
-            self.conversion_thread.finished_signal.connect(self.conversion_finished)
-        else:
-            # 依赖缺失时提示
-            QMessageBox.warning(
-                self,
-                "功能受限",
-                f"缺少必要的转换库：{MISSING_MODULE}\n\n请执行以下命令安装：\n"
-                f"pip install {MISSING_MODULE} -i https://pypi.tuna.tsinghua.edu.cn/simple"
-            )
-
     def init_ui(self):
         # 主窗口设置
         self.setWindowTitle("PDF转换器 - 多功能格式转换工具")
@@ -158,7 +142,6 @@ class PDFConverterGUI(QMainWindow):
 
 
     def create_top_frame(self, parent_layout):
-        """顶部标题栏"""
         top_frame = QFrame()
         top_frame.setStyleSheet("background-color: #3c3f41")
         parent_layout.addWidget(top_frame, 0, 0, 1, 2)
@@ -280,117 +263,6 @@ class PDFConverterGUI(QMainWindow):
         middle_layout.addWidget(recent_label)
 
 
-        # 进度条
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setVisible(False)
-        middle_layout.addWidget(self.progress_bar)
-
-
-    def select_file(self, conversion_type):
-        """选择PDF文件"""
-        if not conversion_type:
-            QMessageBox.information(self, "提示", "请先选择左侧的转换类型（PDF转Word/Excel/图片）")
-            return
-
-        # 选择PDF文件
-        file_path, _ = QFileDialog.getOpenFileName(
-            self,
-            "选择PDF文件",
-            "",
-            "PDF文件 (*.pdf);;所有文件 (*.*)"
-        )
-
-        if not file_path:
-            return
-
-
-        # 设置默认输出文件名
-        base_name = os.path.splitext(file_path)[0]
-        if conversion_type == "pdf2word":
-            output_file = f"{base_name}.docx"
-            file_filter = "Word文件 (*.docx)"
-        elif conversion_type == "pdf2excel":
-            output_file = f"{base_name}.xlsx"
-            file_filter = "Excel文件 (*.xlsx)"
-        else:
-            return
-
-        # 选择保存位置
-        save_path, _ = QFileDialog.getSaveFileName(
-            self,
-            f"保存{conversion_type.replace('pdf2', '')}文件",
-            output_file,
-            file_filter
-        )
-
-        if save_path:
-            self.start_conversion(conversion_type, file_path, save_path)
-
-    def start_conversion(self, conversion_type, input_file, output_file):
-        """启动转换"""
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
-
-        # 禁用按钮
-        self.pdf2word_btn.setEnabled(False)
-        self.pdf2excel_btn.setEnabled(False)
-        self.pdf2img_btn.setEnabled(False)
-
-        # 启动转换线程
-        self.conversion_thread.conversion_type = conversion_type
-        self.conversion_thread.input_file = input_file
-        self.conversion_thread.output_file = output_file
-        self.conversion_thread.start()
-
-    def update_progress(self, value):
-        """更新进度条"""
-        self.progress_bar.setValue(value)
-
-    def conversion_finished(self, success, message):
-        """转换完成回调"""
-        # 启用按钮
-        self.pdf2word_btn.setEnabled(True)
-        self.pdf2excel_btn.setEnabled(True)
-        self.pdf2img_btn.setEnabled(True)
-
-        # 显示结果
-        if success:
-            QMessageBox.information(self, "转换成功", message)
-        else:
-            QMessageBox.critical(self, "转换失败", message)
-
-        self.progress_bar.setValue(0)
-        self.progress_bar.setVisible(False)
-
-        # 限制最多10条
-
-    def select_file_with_path(self, conversion_type, file_path):
-        """使用已有路径转换"""
-        base_name = os.path.splitext(file_path)[0]
-        if conversion_type == "pdf2word":
-            output_file = f"{base_name}.docx"
-            file_filter = "Word文件 (*.docx)"
-        elif conversion_type == "pdf2excel":
-            output_file = f"{base_name}.xlsx"
-            file_filter = "Excel文件 (*.xlsx)"
-        elif conversion_type == "pdf2img":
-            output_file = f"{base_name}.png"
-            file_filter = "图片文件 (*.png)"
-        else:
-            return
-
-        save_path, _ = QFileDialog.getSaveFileName(
-            self,
-            f"保存{conversion_type.replace('pdf2', '')}文件",
-            output_file,
-            file_filter
-        )
-
-        if save_path:
-            self.start_conversion(conversion_type, file_path, save_path)
-
     #跳转新窗口
     def switch_to_select_func(self, conversion_type):
         # 先检查新窗口是否已创建
@@ -404,24 +276,58 @@ class PDFConverterGUI(QMainWindow):
             self.selectfunc.setParent(self)
             self.selectfunc.show()
 
+
+
+
 class SelectFunc(QMainWindow):
     def __init__(self, conversion_type, main_windows):
         super().__init__()
         self.conversion_type = conversion_type
-        self.main_window = main_windows
+        self.main_window = main_windows  # 保存主窗口引用
+        self.file_paths = []  # 修改：从单个文件路径改为列表，存储多选文件
+        self.drag_pos = None  # 初始化拖动位置变量
         self.setStyleSheet("""
         QMainWindow {
-            background-color: #ffffff
+            background-color: #1e1e1e
         }
         QWidget {
             color: #F8FAFC;
         }
+        QListWidget {
+            background-color: #2c2f31;
+            border: 1px solid #444;
+            border-radius: 5px;
+            font-size: 14px;
+            padding: 5px;
+        }
+        QListWidget::item {
+            padding: 8px;
+            border-bottom: 1px solid #3c3f41;
+        }
+        QListWidget::item:selected {
+            background-color: #2196F3;
+            color: white;
+        }
     """)
-        self.move_to_main_window_center()
+        # 先初始化UI，再居中（否则获取不到窗口正确尺寸）
         self.init_ui()
+        self.move_to_main_window_center()
+
+        # 初始化转换线程
+        if CONVERSION_ENABLED:
+            self.conversion_thread = ConversionThread()
+            self.conversion_thread.progress_update.connect(self.update_progress)
+            self.conversion_thread.finished_signal.connect(self.conversion_finished)
+        else:
+            # 依赖缺失时提示
+            QMessageBox.warning(
+                self,
+                "功能受限",
+                f"缺少必要的转换库：{MISSING_MODULE}\n\n请执行以下命令安装：\n"
+                f"pip install {MISSING_MODULE} -i https://pypi.tuna.tsinghua.edu.cn/simple"
+            )
 
     def move_to_main_window_center(self):
-        """将新窗口移动到主窗口正中间"""
         # 获取主窗口的几何信息（位置+大小）
         main_geo = self.main_window.geometry()
         # 获取新窗口的大小
@@ -434,68 +340,106 @@ class SelectFunc(QMainWindow):
         # 应用位置（仅改位置，不改大小）
         self.move(center_x, center_y)
 
-    # 仅修改你提供的代码片段，修复问题并补全必要部分
     def init_ui(self):
         # 中心部件
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
-        # 修复：移除重复的central_widget父容器，使用独立的主布局
+        # 主垂直布局
         layout = QVBoxLayout(central_widget)
 
-        # 修复：second_layout不再绑定central_widget，作为子布局添加到主layout
+        # 子网格布局
         second_layout = QGridLayout()
         second_layout.setSpacing(10)
         second_layout.setContentsMargins(10, 10, 10, 10)
 
         second_layout.setRowStretch(0, 1)
         second_layout.setRowStretch(1, 9)
-        second_layout.setRowStretch(2, 2)
+        second_layout.setRowStretch(2, 3)
 
-        # 修复：将grid布局添加到主垂直布局
+        # 将grid布局添加到主垂直布局
         layout.addLayout(second_layout)
 
         self.create_top_frame(second_layout)
         self.create_middle_frame(second_layout)
         self.create_bottom_frame(second_layout)
 
-
     def create_top_frame(self, parent_layout):
         top_frame = QFrame()
         top_frame.setStyleSheet("background-color: #3c3f41")
         parent_layout.addWidget(top_frame, 0, 0, 1, 2)
         top_layout = QVBoxLayout(top_frame)
-        # 页面内容
-        title = QLabel("✨ PDF转Word 转换界面")
+        # 页面内容：根据转换类型动态显示标题
+        title_text = f"✨ {self.get_conversion_title()}"
+        title = QLabel(title_text)
         title.setStyleSheet("font-size: 20px; color: #2E86AB;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        # 修复：添加标题到布局（原代码遗漏）
         top_layout.addWidget(title)
-
 
     def create_middle_frame(self, parent_layout):
         middle_frame = QFrame()
         middle_frame.setStyleSheet("background-color: #3c3f41")
-        # 修复：设置中间区域跨列显示，避免布局错乱
+        # 跨列显示，避免布局错乱
         parent_layout.addWidget(middle_frame, 1, 0, 1, 2)
 
-        left_layout = QVBoxLayout(middle_frame)
-        left_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
-        left_layout.setContentsMargins(10, 20, 10, 10)
-        left_layout.setSpacing(10)
+        middle_layout = QVBoxLayout(middle_frame)
+        middle_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        middle_layout.setContentsMargins(10, 20, 10, 10)
+        middle_layout.setSpacing(10)
 
+        # 添加提示标签
+        top_tool_layout = QHBoxLayout()
+        list_tip_label = QLabel("已选择的文件：")
+        list_tip_label.setStyleSheet("""
+                font-size: 14px; 
+                color: #2E86AB; 
+                font-weight: bold;
+            """)
+        top_tool_layout.addWidget(list_tip_label)
+        top_tool_layout.addStretch()  # 实现按钮右对齐
+
+        # 删除按钮
+        delete_btn = QPushButton("删除选中文件")
+        delete_btn.clicked.connect(self.delete_selected_file)  # 绑定删除事件
+        top_tool_layout.addWidget(delete_btn)
+        middle_layout.addLayout(top_tool_layout)
+
+
+        # 创建QListWidget用于展示多选文件列表
+        self.file_list_widget = QListWidget()
+        self.file_list_widget.setMinimumHeight(200)  # 设置最小高度，保证显示区域
+        self.file_list_widget.setSelectionMode(QListWidget.SelectionMode.MultiSelection)# 支持批量选择
+
+
+        delete_btn.setStyleSheet("""
+            QPushButton {
+                padding: 8px 16px;
+                font-size: 14px;
+                background-color: #f44336;
+                color: white;
+                border: none;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+            QPushButton:pressed {
+                background-color: #b71c1c;
+            }
+        """)
+
+        middle_layout.addWidget(self.file_list_widget)
 
     def create_bottom_frame(self, parent_layout):
-        # 修复：创建底部容器框架，避免按钮直接添加到grid布局导致位置错乱
         bottom_frame = QFrame()
         bottom_frame.setStyleSheet("background-color: #3c3f41")
         parent_layout.addWidget(bottom_frame, 2, 0, 1, 2)
-        bottom_layout = QVBoxLayout(bottom_frame)
-        bottom_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        bottom_layout.setSpacing(20)
-        bottom_layout.setContentsMargins(20, 20, 20, 20)
+        bottom_layout = QHBoxLayout(bottom_frame)
+        bottom_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        bottom_layout.setContentsMargins(50, 20, 50, 10)
+        bottom_layout.setSpacing(30)
 
-        # 选择文件按钮（复用原有选择文件逻辑）
-        select_btn = QPushButton("选择PDF文件开始转换")
+        # 选择文件按钮
+        select_btn = QPushButton("选择文件")
         select_btn.setStyleSheet("""
             QPushButton {
                 padding: 10px 20px;
@@ -509,10 +453,26 @@ class SelectFunc(QMainWindow):
                 background-color: #45a049;
             }
         """)
-        # 绑定点击事件，触发主窗口的选择文件逻辑
-        select_btn.clicked.connect(lambda: self.parent().select_file(self.conversion_data))
+        select_btn.clicked.connect(lambda: self.select_file(self.conversion_type))
 
-        # 新增：返回主窗口按钮
+        # 转换按钮
+        converter_btn = QPushButton("开始转换")
+        converter_btn.setStyleSheet("""
+            QPushButton {
+                padding: 10px 20px;
+                font-size: 16px;
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        converter_btn.clicked.connect(lambda: self.converter_func(self.conversion_type))
+
+        # 返回主窗口按钮
         back_btn = QPushButton("返回主窗口")
         back_btn.setStyleSheet("""
             QPushButton {
@@ -522,33 +482,209 @@ class SelectFunc(QMainWindow):
                 color: white;
                 border: none;
                 border-radius: 5px;
-                margin-top: 20px;
             }
             QPushButton:hover {
                 background-color: #0b7dda;
             }
         """)
-        # 绑定返回主窗口的逻辑
         back_btn.clicked.connect(self.back_to_main)
 
-        # 修复：将按钮添加到底部布局中（原代码直接添加到grid布局导致位置错误）
+        # 将按钮添加到底部布局
         bottom_layout.addWidget(select_btn)
-        bottom_layout.addWidget(back_btn)  # 加入返回按钮
+        bottom_layout.addWidget(converter_btn)
+        bottom_layout.addWidget(back_btn)
 
+    # 根据转换类型获取标题
+    def get_conversion_title(self):
+        title_map = {
+            "pdf2word": "PDF转Word 转换界面",
+            "pdf2excel": "PDF转Excel 转换界面",
+            "word2pdf": "word转PDF 转换界面",
+            "excel2pdf": "excel转PDF 转换界面"
+        }
+        return title_map.get(self.conversion_type, "PDF转换界面")
 
-    # 实现窗口拖动（自定义标题栏必备）
+    # 实现窗口拖动
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             event.accept()
 
     def mouseMoveEvent(self, event):
-        if event.buttons() == Qt.MouseButton.LeftButton:
+        if event.buttons() == Qt.MouseButton.LeftButton and self.drag_pos is not None:
             self.move(event.globalPosition().toPoint() - self.drag_pos)
             event.accept()
 
+    def select_file(self, conversion_type):
+        if not conversion_type:
+            QMessageBox.information(self, "提示", "请先选择左侧的转换类型（PDF转Word/Excel/图片）")
+            return
+        if conversion_type in ["pdf2word", "pdf2excel", "pdf2img"]:
+            # PDF转其他格式：仅筛选PDF文件
+            file_paths, _ = QFileDialog.getOpenFileNames(
+                self,
+                "选择PDF文件（可多选）",
+                "",
+                "PDF文件 (*.pdf);;所有文件 (*.*)"
+            )
+        elif conversion_type == "word2pdf":
+            # Word转PDF：筛选docx/doc格式（新版+旧版Word文件）
+            file_paths, _ = QFileDialog.getOpenFileNames(
+                self,
+                "选择Word文件（可多选）",
+                "",
+                "Word文件 (*.docx *.doc);;所有文件 (*.*)"
+            )
+        elif conversion_type == "excel2pdf":
+            # 扩展：Excel转PDF：筛选xlsx/xls格式（新版+旧版Excel文件）
+            file_paths, _ = QFileDialog.getOpenFileNames(
+                self,
+                "选择Excel文件（可多选）",
+                "",
+                "Excel文件 (*.xlsx *.xls);;所有文件 (*.*)"
+            )
+        elif conversion_type == "img2pdf":
+            # 扩展：图片转PDF：筛选常见图片格式
+            file_paths, _ = QFileDialog.getOpenFileNames(
+                self,
+                "选择图片文件（可多选）",
+                "",
+                "图片文件 (*.png *.jpg *.jpeg *.bmp);;所有文件 (*.*)"
+            )
 
-    # 新增：返回主窗口的方法
+
+        if file_paths:
+            self.file_paths = file_paths  # 保存多选文件路径到列表
+            self.update_file_list_widget()  # 更新文件列表显示
+
+
+    def update_file_list_widget(self):
+
+        # 若有选中文件，逐个添加到列表
+        if self.file_paths:
+            for file_path in self.file_paths:
+                # 获取文件名，同时显示完整路径可改为直接用file_path
+                file_name = os.path.basename(file_path)
+                list_item = QListWidgetItem(f"{file_name}")
+                self.file_list_widget.addItem(list_item)
+        else:
+            # 若无选中文件，显示提示文字
+            self.file_list_widget.addItem(QListWidgetItem("暂无选中文件"))
+
+    def converter_func(self, conversion_type):
+        # 先判断是否选择了文件
+        if not self.file_paths:
+            QMessageBox.warning(self, "警告", "请先选择要转换的PDF文件！")
+            return
+
+        if not conversion_type:
+            QMessageBox.warning(self, "警告", "转换类型异常！")
+            return
+
+        # 批量处理每个选中的文件
+        for file_path in self.file_paths:
+            # 设置默认输出文件名
+            file_name = os.path.basename(file_path)
+            base_name = os.path.splitext(file_name)[0]
+
+            if conversion_type == "pdf2word":
+                output_file = f"{base_name}.docx"
+                file_filter = "Word文件 (*.docx)"
+            elif conversion_type == "pdf2excel":
+                output_file = f"{base_name}.xlsx"
+                file_filter = "Excel文件 (*.xlsx)"
+            elif conversion_type == "pdf2img":
+                output_file = f"{base_name}.png"
+                file_filter = "图片文件 (*.png *.jpg)"
+            else:
+                QMessageBox.warning(self, "警告", f"不支持的转换类型：{conversion_type}")
+                continue
+
+            # 选择保存位置
+            save_path = QFileDialog.getExistingDirectory(
+                self,
+                f"保存{conversion_type.replace('pdf2', '')}文件",
+            )
+
+            if save_path:
+                self.start_conversion(conversion_type, file_path, save_path)
+
+
+
+    def start_conversion(self, conversion_type, file_path, save_path):
+        QMessageBox.information(self, "转换提示",
+            f"正在转换：\n源文件：{os.path.basename(file_path)}\n目标文件：{os.path.basename(save_path)}\n转换类型：{conversion_type}")
+
+
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+        # 禁用按钮
+        self.pdf2word_btn.setEnabled(False)
+        self.pdf2excel_btn.setEnabled(False)
+        self.pdf2img_btn.setEnabled(False)
+        # 启动转换线程
+        self.conversion_thread.conversion_type = conversion_type
+        self.conversion_thread.input_file = file_path
+        self.conversion_thread.output_file = save_path
+        self.conversion_thread.start()
+
+
+
+    def update_progress(self, value):
+        """更新进度条"""
+        self.progress_bar.setValue(value)
+
+
+
+    def conversion_finished(self, success, message):
+        # 显示结果
+        if success:
+            QMessageBox.information(self, "转换成功", message)
+        else:
+            QMessageBox.information(self, "转换失败", message)
+
+        self.progress_bar.setValue(0)
+        self.progress_bar.setVisible(False)
+
+
+
+    def delete_selected_file(self):
+
+        # 获取选中项，无选中则提示
+        selected_items = self.file_list_widget.selectedItems()
+        if not selected_items:
+            QMessageBox.warning(self, "提示", "请先选中要删除的文件！")
+            return
+
+        # 确认删除弹窗
+        confirm = QMessageBox.question(
+            self,
+            "确认删除",
+            f"是否确定删除选中的 {len(selected_items)} 个文件？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        # 提取选中文件名，移除列表项
+        selected_file_names = []
+        for item in selected_items:
+            file_name = item.text().replace("📄 ", "")
+            selected_file_names.append(file_name)
+            self.file_list_widget.takeItem(self.file_list_widget.row(item))
+
+        # 同步更新self.file_paths数据
+        new_file_paths = []
+        for file_path in self.file_paths:
+            base_name = os.path.basename(file_path)
+            if base_name not in selected_file_names:
+                new_file_paths.append(file_path)
+        self.file_paths = new_file_paths
+
+        QMessageBox.information(self, "成功", f"已成功删除 {len(selected_items)} 个文件！")
+
+    # 返回主窗口的方法
     def back_to_main(self):
         self.close()
 
