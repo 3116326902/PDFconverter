@@ -2,8 +2,7 @@ import sys
 import os
 from docx import Document
 from fpdf import FPDF
-import comtypes.client
-
+import popdf
 
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QFrame, QLabel, QPushButton, QProgressBar,
@@ -11,7 +10,7 @@ from PyQt6.QtWidgets import (
     QListWidgetItem
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QFont, QPixmap
+from PyQt6.QtGui import QFont, QPixmap, QDragEnterEvent, QDropEvent
 
 # 尝试导入转换库，缺失时提供友好提示
 try:
@@ -74,13 +73,12 @@ class ConversionThread(QThread):
             return self.PDF_output_file
 
     def pdf_to_word(self):
-
+        """PDF转 word"""
         if os.path.exists(self.Word_output_file):
             try:
                 os.remove(self.Word_output_file)  # 删除旧文件
             except Exception as e:
                 raise Exception(f"无法删除旧Word文件：{e}，请关闭该文件后重试")
-
 
         cv = Converter(self.input_file)
         pdf_doc = fitz.open(self.input_file)
@@ -89,7 +87,7 @@ class ConversionThread(QThread):
 
         # 分步转换并更新进度
         for i in range(total_pages):
-            cv.convert(self.Word_output_file, start=i, end=i + 1, append=True, multi_processing=False)
+            cv.convert(self.Word_output_file)
             self.progress_update.emit(int((i + 1) / total_pages * 100))
             print(f"已转换第 {i + 1} 页")  # 调试用：确认逐页执行
         print(f"转换完成")
@@ -164,7 +162,6 @@ class ConversionThread(QThread):
         # 保存PDF文件
         pdf.output(self.PDF_output_file)
         self.progress_update.emit(100)
-
 
 
 class PDFConverterGUI(QMainWindow):
@@ -447,6 +444,30 @@ class SelectFunc(QMainWindow):
         self.file_list_widget = QListWidget()
         self.file_list_widget.setMinimumHeight(200)
         self.file_list_widget.setSelectionMode(QListWidget.SelectionMode.MultiSelection)
+
+        # 开启拖放接受功能
+        self.file_list_widget.setAcceptDrops(True)
+        # 隐藏默认拖放指示器（如需自定义样式）
+        self.file_list_widget.setDropIndicatorShown(True)
+
+        # 补充QListWidget样式，与深色主题统一
+        self.file_list_widget.setStyleSheet("""
+                   QListWidget {
+                       background-color: #2b2b2b;
+                       color: #ffffff;
+                       font-size: 13px;
+                       border: none;
+                       border-radius: 6px;
+                       padding: 5px;
+                   }
+                   QListWidget::item:selected {
+                       background-color: #2E86AB;
+                       color: white;
+                   }
+                   QListWidget::item:hover {
+                       background-color: #4a4d4f;
+                   }
+               """)
         middle_layout.addWidget(self.file_list_widget)
 
         # 进度条
@@ -465,6 +486,43 @@ class SelectFunc(QMainWindow):
         """)
         self.progress_bar.setValue(0)
         middle_layout.addWidget(self.progress_bar)
+
+        # 判断拖入数据是否合法
+
+    def dragEnterEvent(self, event: QDragEnterEvent):
+        # 判断是否为文件路径数据
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()  # 允许拖放
+        else:
+            event.ignore()  # 忽略无效拖放
+
+        # 支持拖放过程中移动
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            event.ignore()
+
+        # 处理拖放落地逻辑，添加文件到列表
+
+    def dropEvent(self, event: QDropEvent):
+        # 获取拖入的所有数据（URL格式）
+        mime_data = event.mimeData()
+        if not mime_data.hasUrls():
+            event.ignore()
+            return
+
+        # 遍历所有URL，转换为本地文件路径
+        for url in mime_data.urls():
+            # 关键：将QUrl转换为本地文件路径（解决中文路径乱码问题）
+            file_path = url.toLocalFile()
+            # 过滤：只添加实际存在的文件（排除文件夹）
+            if os.path.isfile(file_path):
+                # 添加文件路径（也可只添加文件名：os.path.basename(file_path)）
+                self.file_list_widget.addItem(file_path)
+
+        event.acceptProposedAction()
 
     def create_bottom_frame(self, parent_layout):
         """底部按钮框架"""
@@ -581,10 +639,13 @@ class SelectFunc(QMainWindow):
 
     def delete_selected_file(self):
         """删除选中文件"""
-        for item in self.file_list_widget.selectedItems():
-            index = self.file_list_widget.row(item)
-            self.file_list_widget.takeItem(index)
-            del self.file_paths[index]
+        selected_items = self.file_list_widget.selectedItems()
+        if not selected_items:
+            return  # 无选中项时直接返回
+        # 反向删除避免正向删除导致索引错乱
+        for item in reversed(selected_items):
+            row = self.file_list_widget.row(item)
+            self.file_list_widget.takeItem(row)
 
     def back_to_main(self):
         """返回主窗口"""
